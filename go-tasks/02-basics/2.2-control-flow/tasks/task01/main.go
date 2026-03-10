@@ -34,7 +34,11 @@ func main() {
 		// TODO: добавь switch с условиями для FizzBuzz
 		// Порядок важен: сначала проверяй делимость на 15 (и на 3, и на 5),
 		// потом на 3, потом на 5, потом остальное.
-
-		fmt.Println(i) // эту строку замени или оберни в switch
+		switch {
+			case i%15 == 0: fmt.Println("FizzBuzz")
+			case i%3  == 0: fmt.Println("Fizz")
+			case i%5  == 0: fmt.Println("Buzz")
+			default: fmt.Println(i)
+		}
 	}
 }
