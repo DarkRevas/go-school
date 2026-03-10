@@ -25,7 +25,7 @@ package main
 
 import (
 	// TODO: импортируй пакет из module-b
-	// "github.com/yourname/module-b"
+	"github.com/revashole/module-b"
 	"fmt"
 )
 
@@ -33,5 +33,5 @@ func main() {
 	// TODO: вызови функцию SayHello из пакета module-b
 	// Пример: fmt.Println(moduleb.SayHello())
 
-	fmt.Println("Допиши этот код!")
+	fmt.Println(moduleb.SayHello())
 }

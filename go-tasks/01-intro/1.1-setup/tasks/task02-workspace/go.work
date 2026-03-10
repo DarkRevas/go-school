@@ -1,0 +1,6 @@
+go 1.23
+
+use (
+	./module-a
+	./module-b
+)
