@@ -19,10 +19,28 @@
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"unicode"
+)
 
 // TODO: напиши функцию countVowels(s string) int
 // Внутри используй for range и switch для проверки каждого символа
+func countVowels(s string) int {
+	count := 0
+	for _, r := range s {
+		switch unicode.ToLower(r) {
+		// Русские гласные
+		case 'а', 'е', 'ё', 'и', 'й', 'о', 'у', 'ы', 'э', 'ю', 'я':
+			count++
+		// Латинские гласные
+		case 'a', 'e', 'i', 'o', 'u':
+			count++
+		}
+	}
+	return count
+}
+
 
 func main() {
 	tests := []string{"Привет мир", "Hello World", "Go"}
