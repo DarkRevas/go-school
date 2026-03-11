@@ -27,19 +27,18 @@ const (
     StatusCancelled      
 )
 // TODO: заполни константы здесь
+var statusNames = map[int]string{
+	StatusNew:       "Новый",
+	StatusInWork:    "В работе",
+	StatusDone:      "Выполнен",
+	StatusCancelled: "Отменён",
+}
+
 func statusName(status int) string {
-	switch status {
-	case StatusNew:
-		return "Новый"
-	case StatusInWork:
-		return "В работе"
-	case StatusDone:
-		return "Выполнен"
-	case StatusCancelled:
-		return "Отменён"
-	default:
-		return "Неизвестный статус"
+	if name, ok := statusNames[status]; ok {
+		return name
 	}
+	return "Неизвестный статус"
 }
 // TODO: напиши функцию statusName, которая принимает int
 // и возвращает строку с названием статуса.
