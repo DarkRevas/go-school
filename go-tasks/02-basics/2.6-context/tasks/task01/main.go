@@ -26,16 +26,26 @@ import (
 	"time"
 )
 
-// TODO: напиши функцию fetchData(ctx context.Context) (string, error)
+// TODO: напиши функцию 
+func fetchData(ctx context.Context) (string, error) {
+	select {
+	case <-time.After(3 * time.Second):
+		return "данные получены", nil
+	case <-ctx.Done():
+		return "Запрос не успел:", ctx.Err()
+	}
+}
 
 func main() {
 	// TODO: создай контекст с таймаутом 1 секунда
-	// ctx, cancel := context.WithTimeout(...)
-	// defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 
 	// TODO: вызови fetchData(ctx) и обработай результат
 
-	_ = context.Background() // убери когда начнёшь использовать context
-	_ = fmt.Println          // убери когда начнёшь использовать fmt
-	_ = time.Second          // убери когда начнёшь использовать time
+	fmt.Println(fetchData(ctx))
+
+	// _ = context.Background() // убери когда начнёшь использовать context
+	// _ = fmt.Println          // убери когда начнёшь использовать fmt
+	// _ = time.Second          // убери когда начнёшь использовать time
 }
