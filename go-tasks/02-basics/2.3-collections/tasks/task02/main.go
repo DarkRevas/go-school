@@ -24,7 +24,7 @@ import (
 
 // TODO: напиши функцию invertMap(m map[string]int) map[int]string
 func invertMap(m map[string]int) map[int]string {
-	result := make(map[int]string)
+	result := make(map[int]string, len(m))
 
 	for k, v := range m {
 		result[v] = k
