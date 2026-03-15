@@ -30,6 +30,12 @@ import (
 
 // TODO: напиши функцию timeTrack(name string) func()
 // Подсказка: используй time.Now() для старта и time.Since(start) для подсчёта
+func timeTrack(name string) func() {
+	start := time.Now()
+	return func () {
+		fmt.Printf("%s заняло:%s \n", name, time.Since(start))
+	}
+}
 
 func slowWork() {
 	defer timeTrack("долгая операция")()
