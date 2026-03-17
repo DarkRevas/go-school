@@ -27,6 +27,17 @@ import (
 // TODO: напиши функцию Fibonacci() iter.Seq[int]
 // Подсказка: используй две переменные a и b
 // Не забудь проверить возвращаемое значение yield!
+func Fibonacci() iter.Seq[int] {
+	return func(yield func(int) bool) {
+		a, b := 0, 1
+		for {
+			if !yield(a) { // прерываем итерацию, если yield вернул false
+				return
+			}
+			a, b = b, a+b
+		}
+	}
+}
 
 func main() {
 	count := 0
@@ -38,6 +49,4 @@ func main() {
 		}
 	}
 	fmt.Println()
-
-	_ = iter.Seq[int](nil) // убери когда начнёшь использовать
 }
