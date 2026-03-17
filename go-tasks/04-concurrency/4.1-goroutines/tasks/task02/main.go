@@ -25,22 +25,43 @@ package main
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 func main() {
 	var counter int // ПРОБЛЕМА: несколько горутин пишут сюда одновременно
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			mu.Lock()
 			counter++ // ГОНКА: чтение + запись не атомарны!
+			mu.Unlock()
 		}()
 	}
 
 	wg.Wait()
 	// Из-за гонки counter может быть меньше 1000
 	fmt.Println("Финальное значение счётчика:", counter)
+	fmt.Println("(Правильное значение должно быть 1000)")
+
+	fmt.Println("-----------------------------------------------")
+
+	var counterAtomic int32
+
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			atomic.AddInt32(&counterAtomic, 1) // ГОНКА: чтение + запись не атомарны!
+		}()
+	}
+
+	wg.Wait()
+	// Из-за гонки counter может быть меньше 1000
+	fmt.Println("Финальное значение счётчика:", counterAtomic)
 	fmt.Println("(Правильное значение должно быть 1000)")
 }
