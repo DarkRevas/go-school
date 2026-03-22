@@ -26,23 +26,48 @@ func main() {
 	// TODO: объяви WaitGroup
 	var wg sync.WaitGroup
 
+	// Тут рандомный вывод
+
 	for i := 1; i <= 10; i++ {
 		// TODO: увеличь счётчик wg на 1
-
+		wg.Add(1)
 		// TODO: запусти горутину, передав i как параметр
 		// Внутри горутины:
 		//   - вызови defer wg.Done()
 		//   - сгенерируй случайное время: rand.Intn(150)+50 миллисекунд
 		//   - подожди это время через time.Sleep
 		//   - выведи результат
-
-		_ = i // удали эту строку когда добавишь код
+		go func(i int) {
+			defer wg.Done()
+			start := time.Now()
+			time.Sleep(time.Duration(rand.Intn(150)+50))
+			fmt.Printf("Задача %v выполнена за %vms \n", i, time.Since(start))
+		}(i)
 	}
 
 	// TODO: дождись всех горутин через wg.Wait()
+	wg.Wait()
 
-	_ = fmt.Println // убери когда начнёшь использовать
-	_ = rand.Intn   // убери когда начнёшь использовать
-	_ = time.Sleep  // убери когда начнёшь использовать
-	_ = wg          // убери когда начнёшь использовать
+	fmt.Printf("----------------------------------------\n")
+
+	// Тут гарантированный порядок задач
+
+	numGorutines := 10
+	sl := make([]string, numGorutines)
+
+	for i := range numGorutines {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			start := time.Now()
+			time.Sleep(time.Duration(rand.Intn(150)+50))
+			sl[i] = fmt.Sprintf("Задача %v выполнена за %vms \n", i, time.Since(start))
+		}(i)
+	}
+	
+	wg.Wait()
+
+	for _, el := range sl {
+		fmt.Println(el)
+	}
 }
