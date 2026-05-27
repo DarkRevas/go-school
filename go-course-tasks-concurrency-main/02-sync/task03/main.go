@@ -32,64 +32,31 @@ type Semaphore struct {
 }
 
 // NewSemaphore создаёт семафор с ёмкостью n.
+// Подсказка: сам канал представляет токены
 func NewSemaphore(n int) *Semaphore {
-	ch := make(chan struct{}, n)
-	for range n {
-		ch <- struct{}{}
-	}
-	return &Semaphore{ch: ch}
+	return &Semaphore{}
 }
 
 // Acquire блокирующий захват n единиц.
-// TODO: реализуй через цикл с чтением из ch
+// TODO: реализуй
 func (s *Semaphore) Acquire(n int) {
-	for range n {
-		<-s.ch
-	}
 }
 
 // AcquireContext захват с контекстом — можно отменить.
-// TODO: реализуй — если ctx отменён до получения всех n единиц,
-//       верни уже захваченные обратно и вернуть ctx.Err()
+// TODO: если отмена настигнет в середине — верни уже захваченное и верни ошибку
 func (s *Semaphore) AcquireContext(ctx context.Context, n int) error {
-	acquired := 0
-	for range n {
-		select {
-		case <-s.ch:
-			acquired++
-		case <-ctx.Done():
-			// Возвращаем уже захваченное
-			s.Release(acquired)
-			return ctx.Err()
-		}
-	}
 	return nil
 }
 
 // TryAcquire non-blocking захват. Возвращает false если доступно < n.
-// TODO: реализуй
+// TODO: необходимо попытаться захватить не блокируясь; если не удалось — откатить всё что уже взяли
 func (s *Semaphore) TryAcquire(n int) bool {
-	// Подсказка: проверь len(s.ch), потом попробуй захватить
-	if len(s.ch) < n {
-		return false
-	}
-	// TODO: захвати через default в select
-	for range n {
-		select {
-		case <-s.ch:
-		default:
-			s.Release(n - 1) // вернём уже взятые
-			return false
-		}
-	}
-	return true
+	return false
 }
 
 // Release возвращает n единиц.
+// TODO: реализуй
 func (s *Semaphore) Release(n int) {
-	for range n {
-		s.ch <- struct{}{}
-	}
 }
 
 // Available возвращает количество свободных единиц.

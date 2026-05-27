@@ -25,55 +25,35 @@ package main
 import (
 	"fmt"
 	"sort"
-	"sync"
 )
 
 // TODO: реализуй merge2
+// Подсказка: когда один из каналов закрылся — надо продолжать читать из другого,
+// но select всё равно может выбрать закрытый (он отдаёт zero-value) — подумай как его исключить
 func merge2(a, b <-chan int) <-chan int {
 	out := make(chan int)
 	go func() {
 		defer close(out)
-		// TODO: используй for + select с nil-каналами для завершения
-		for a != nil || b != nil {
-			select {
-			case v, ok := <-a:
-				if !ok {
-					a = nil // nil-канал никогда не выбирается в select
-					continue
-				}
-				out <- v
-			case v, ok := <-b:
-				if !ok {
-					b = nil
-					continue
-				}
-				out <- v
-			}
-		}
+		// TODO
 	}()
 	return out
 }
 
-// TODO: реализуй mergeN через sync.WaitGroup
+// TODO: реализуй mergeN
+// Подсказка: запусти по горутине на каждый канал; нужна синхронизация чтобы
+// понять когда все каналы иссякли — только после этого можно закрыть out
 func mergeN(channels ...<-chan int) <-chan int {
 	out := make(chan int)
-	var wg sync.WaitGroup
-
-	// TODO: на каждый канал — горутина
-	// TODO: WaitGroup.Wait() в отдельной горутине, потом close(out)
-	_ = wg
-	_ = channels
-
+	// TODO
 	return out
 }
 
-// TODO: реализуй mergeOrdered
-// Подсказка: для каждого входного канала запусти горутину
-// которая читает значения последовательно — это гарантирует порядок внутри канала
+// TODO: реализуй mergeOrdered — сохрани порядок внутри каждого канала
+// Подсказка: достаточно ли уже готового mergeN, или нужно что-то ещё?
+// Подумай: если горутина читает из канала последовательно — может ли она нарушить порядок?
 func mergeOrdered(channels ...<-chan int) <-chan int {
-	// По сути то же что mergeN — горутины на каждый канал уже гарантируют
-	// что значения из одного канала не переставятся
-	return mergeN(channels...)
+	// TODO
+	return nil
 }
 
 func sourceChan(nums ...int) <-chan int {

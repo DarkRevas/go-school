@@ -26,62 +26,15 @@ package main
 import (
 	"fmt"
 	"sort"
-	"sync"
 	"testing"
 )
 
 // === Вариант 1: через каналы ===
 
+// TODO: реализуй producerConsumerChan
+// Подсказка: два буферизованных канала и два WaitGroup — для производителей и потребителей
 func producerConsumerChan(producers, consumers, n, bufSize int) []int {
-	jobs := make(chan int, bufSize)
-	results := make(chan int, n)
-
-	// Производители
-	var prodWg sync.WaitGroup
-	for p := 0; p < producers; p++ {
-		prodWg.Add(1)
-		start := p * (n / producers)
-		end := start + (n / producers)
-		if p == producers-1 {
-			end = n
-		}
-		go func(from, to int) {
-			defer prodWg.Done()
-			for i := from; i < to; i++ {
-				jobs <- i
-			}
-		}(start, end)
-	}
-
-	// Закрываем jobs когда все производители закончили
-	go func() {
-		prodWg.Wait()
-		close(jobs)
-	}()
-
-	// Потребители
-	var consWg sync.WaitGroup
-	for c := 0; c < consumers; c++ {
-		consWg.Add(1)
-		go func() {
-			defer consWg.Done()
-			for job := range jobs {
-				results <- job * job
-			}
-		}()
-	}
-
-	// Закрываем results когда все потребители закончили
-	go func() {
-		consWg.Wait()
-		close(results)
-	}()
-
-	var out []int
-	for r := range results {
-		out = append(out, r)
-	}
-	return out
+	return nil
 }
 
 func TestProducerConsumer(t *testing.T) {
@@ -97,6 +50,28 @@ func TestProducerConsumer(t *testing.T) {
 		want := i * i
 		if v != want {
 			t.Errorf("[%d] = %d, want %d", i, v, want)
+		}
+	}
+}
+
+// === Вариант 2: через sync.Cond ===
+
+// TODO: реализуй producerConsumerCond
+// Подсказка: буфер — обычный срез; производители ждут пока буфер полон, потребители — пока пуст
+func producerConsumerCond(producers, consumers, n, bufSize int) []int {
+	return nil
+}
+
+func TestProducerConsumerCond(t *testing.T) {
+	results := producerConsumerCond(3, 4, 20, 5)
+	sort.Ints(results)
+
+	if len(results) != 20 {
+		t.Fatalf("ожидали 20 результатов, получили %d", len(results))
+	}
+	for i, v := range results {
+		if v != i*i {
+			t.Errorf("[%d] = %d, want %d", i, v, i*i)
 		}
 	}
 }

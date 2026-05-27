@@ -42,56 +42,21 @@ type WorkerPool struct {
 
 // TODO: реализуй NewWorkerPool
 func NewWorkerPool(workers int) *WorkerPool {
-	p := &WorkerPool{
-		jobs: make(chan func(), 100),
-	}
-	p.wg.Add(workers)
-	for range workers {
-		go func() {
-			defer p.wg.Done()
-			p.running.Add(1)
-			defer p.running.Add(-1)
-			for job := range p.jobs {
-				job()
-			}
-		}()
-	}
-	return p
+	return nil
 }
 
 // TODO: реализуй Submit
+// Подсказка: что если очередь уже полна или пул остановлен?
 func (p *WorkerPool) Submit(task func()) bool {
-	select {
-	case p.jobs <- task:
-		return true
-	default:
-		// очередь переполнена
-		return false
-	}
+	return false
 }
 
-// Stop ждёт завершения всех задач
+// TODO: Stop ждёт завершения всех задач
 func (p *WorkerPool) Stop() {
-	p.once.Do(func() {
-		close(p.jobs)
-	})
-	p.wg.Wait()
 }
 
-// StopNow немедленно закрывает канал, дропает незапущенные задачи
+// TODO: StopNow немедленная остановка — дропает незапущенные задачи вместо ожидания
 func (p *WorkerPool) StopNow() {
-	p.once.Do(func() {
-		// Дренируем незапущенные задачи
-		for {
-			select {
-			case <-p.jobs:
-			default:
-				close(p.jobs)
-				return
-			}
-		}
-	})
-	p.wg.Wait()
 }
 
 func (p *WorkerPool) Running() int {

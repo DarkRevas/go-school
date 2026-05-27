@@ -51,12 +51,7 @@ func mockFetch(ctx context.Context, url string) (Result, error) {
 }
 
 // TODO: реализуй fastest
-// Алгоритм:
-//   1. Для каждого url запусти горутину с mockFetch
-//   2. Через select жди первый успешный результат
-//   3. При получении — отмени контекст (остальные сами остановятся)
-//   4. Если все вернули ошибку — вернуть ErrAllFailed
-//   5. Если ctx отменён раньше — вернуть ErrTimeout
+// Подсказка: отмена ctx распространяется на все запросы автоматически — не заботься об явном завершении
 func fastest(ctx context.Context, urls []string) (Result, error) {
 	// TODO: реализуй
 	return Result{}, errors.New("TODO: реализуй")
@@ -64,7 +59,7 @@ func fastest(ctx context.Context, urls []string) (Result, error) {
 
 // TODO: реализуй withTimeout
 func withTimeout(d time.Duration, fn func() (string, error)) (string, error) {
-	// TODO: запусти fn в горутине, используй select с time.After
+	// TODO
 	return "", errors.New("TODO: реализуй")
 }
 

@@ -64,8 +64,11 @@ func (c *mockConn) Ping() error {
 	}
 	return nil
 }
-func (c *mockConn) Close() error { fmt.Printf("закрыто соединение %d\n", c.id); return nil }
-func (c *mockConn) ID() int      { return c.id }
+func (c *mockConn) Close() error {
+	fmt.Printf("закрыто соединение %d\n", c.id)
+	return nil
+}
+func (c *mockConn) ID() int { return c.id }
 
 var connIDCounter atomic.Int32
 
@@ -92,98 +95,19 @@ func NewPool(maxConn int, factory func() (Conn, error)) *Pool {
 }
 
 // TODO: реализуй Acquire
-// Алгоритм:
-//   1. Lock
-//   2. Если есть idle соединение — взять его, проверить Ping
-//      Если Ping упал — выбросить, создать новое
-//   3. Если idle пуст и total < maxConn — создать новое соединение
-//   4. Если idle пуст и total == maxConn — ждать через cond.Wait
-//      Учитывай ctx.Done() (запусти горутину которая вызовет cond.Broadcast при отмене)
+// Подсказка: три сценария: idle есть, можно создать, нужно ждать
+// Отмена ctx должна разбудить ожидающего — подумай как
 func (p *Pool) Acquire(ctx context.Context) (Conn, error) {
-	// Горутина для отмены через контекст
-	cancelCh := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			p.cond.Broadcast() // разбудим ожидающих
-		case <-cancelCh:
-		}
-	}()
-	defer close(cancelCh)
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	for {
-		if p.closed {
-			return nil, ErrPoolClosed
-		}
-
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		// Есть idle соединение
-		if len(p.idle) > 0 {
-			conn := p.idle[len(p.idle)-1]
-			p.idle = p.idle[:len(p.idle)-1]
-
-			// Health check
-			if conn.Ping() != nil {
-				conn.Close()
-				// TODO: создай новое соединение
-				continue
-			}
-
-			p.inUse++
-			p.acquired.Add(1)
-			return conn, nil
-		}
-
-		// Можем создать новое
-		if p.inUse < p.maxConn {
-			p.mu.Unlock()
-			conn, err := p.factory()
-			p.mu.Lock()
-			if err != nil {
-				return nil, err
-			}
-			p.inUse++
-			p.acquired.Add(1)
-			return conn, nil
-		}
-
-		// Ждём
-		p.cond.Wait()
-	}
+	return nil, ErrPoolClosed
 }
 
 // TODO: реализуй Release
+// Подсказка: после возврата нужно разбудить ожидающего
 func (p *Pool) Release(conn Conn) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.inUse--
-	p.released.Add(1)
-
-	if !p.closed {
-		p.idle = append(p.idle, conn)
-	} else {
-		conn.Close()
-	}
-	p.cond.Signal()
 }
 
 // TODO: реализуй Close
 func (p *Pool) Close() {
-	p.mu.Lock()
-	p.closed = true
-	for _, conn := range p.idle {
-		conn.Close()
-	}
-	p.idle = nil
-	p.cond.Broadcast()
-	p.mu.Unlock()
 }
 
 func (p *Pool) Stats() PoolStats {

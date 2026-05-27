@@ -41,39 +41,10 @@ type Group[T any] struct {
 }
 
 // TODO: реализуй Do
-// Алгоритм:
-//   1. Lock, проверь есть ли уже вызов с этим ключом
-//   2. Если есть — Unlock, wg.Wait(), вернуть результат с shared=true
-//   3. Если нет — создай call, добавь в map, Unlock
-//   4. Выполни fn()
-//   5. Сохрани результат, wg.Done(), удали из map
-//   6. Вернуть результат с shared=false
+// Подсказка: если вызов с таким ключом уже есть — не запускай fn снова, дождись результата первого
 func (g *Group[T]) Do(key string, fn func() (T, error)) (T, error, bool) {
-	g.mu.Lock()
-
-	if g.calls == nil {
-		g.calls = make(map[string]*call[T])
-	}
-
-	if c, ok := g.calls[key]; ok {
-		g.mu.Unlock()
-		c.wg.Wait()
-		return c.val, c.err, true // shared
-	}
-
-	c := &call[T]{}
-	c.wg.Add(1)
-	g.calls[key] = c
-	g.mu.Unlock()
-
-	c.val, c.err = fn()
-	c.wg.Done()
-
-	g.mu.Lock()
-	delete(g.calls, key)
-	g.mu.Unlock()
-
-	return c.val, c.err, false
+	var zero T
+	return zero, nil, false
 }
 
 func main() {

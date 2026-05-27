@@ -32,11 +32,11 @@ import (
 )
 
 type Barrier struct {
-	n       int
-	count   atomic.Int32
-	mu      sync.Mutex
-	cond    *sync.Cond
-	phase   atomic.Int64 // для определения "поколения" барьера
+	n     int
+	count atomic.Int32
+	mu    sync.Mutex
+	cond  *sync.Cond
+	phase atomic.Int64 // для определения "поколения" барьера
 }
 
 // TODO: реализуй NewBarrier
@@ -47,30 +47,11 @@ func NewBarrier(n int) *Barrier {
 }
 
 // TODO: реализуй Wait
-// Алгоритм:
-//   1. Инкрементируй счётчик пришедших
-//   2. Если это последняя горутина (count == n):
-//      - сбрось count = 0
-//      - поменяй phase
-//      - вызови cond.Broadcast()
-//   3. Иначе — жди (cond.Wait) пока phase не изменится
+// Подсказка: последняя пришедшая горутина пробуждает остальных; остальные ждут смены phase
 func (b *Barrier) Wait() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	phase := b.phase.Load()
-	b.count.Add(1)
-
-	if int(b.count.Load()) == b.n {
-		b.count.Store(0)
-		b.phase.Add(1)
-		b.cond.Broadcast()
-	} else {
-		// TODO: жди пока phase не изменится
-		for b.phase.Load() == phase {
-			b.cond.Wait()
-		}
-	}
+	// TODO
 }
 
 func main() {

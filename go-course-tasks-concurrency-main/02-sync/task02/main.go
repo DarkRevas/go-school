@@ -58,7 +58,7 @@ var (
 
 // TODO: реализуй GetDB_Once
 func GetDB_Once() *MockDB {
-	// TODO: используй onceDB.Do(func() { singleDB = NewMockDB() })
+	// TODO
 	return nil
 }
 
@@ -83,9 +83,7 @@ func (o *OnceWithError) Do(fn func() (any, error)) (any, error) {
 		return o.val, o.err
 	}
 
-	// TODO: вызови fn()
-	// TODO: если err == nil — установи done = true
-	// TODO: сохрани val и err
+	// TODO: вызови fn(), сохрани результат; done = true только при успехе
 	return nil, errors.New("TODO: реализуй")
 }
 

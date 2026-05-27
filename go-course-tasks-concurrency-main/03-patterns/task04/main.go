@@ -37,58 +37,38 @@ import (
 var ErrFutureTimeout = errors.New("future: таймаут истёк")
 
 type Future[T any] struct {
-	once   sync.Once
-	done   chan struct{}
-	value  T
-	err    error
+	once  sync.Once
+	done  chan struct{}
+	value T
+	err   error
 }
 
 // TODO: реализуй Async — запускает fn в горутине, возвращает Future
+// Подсказка: закрытие канала — универсальный сигнал готовности
 func Async[T any](fn func() (T, error)) *Future[T] {
-	f := &Future[T]{
-		done: make(chan struct{}),
-	}
-	go func() {
-		f.once.Do(func() {
-			f.value, f.err = fn()
-			close(f.done)
-		})
-	}()
-	return f
+	return nil
 }
 
-// TODO: реализуй Await — блокируется до получения результата
+// TODO: реализуй Await
 func (f *Future[T]) Await() (T, error) {
-	<-f.done
-	return f.value, f.err
+	var zero T
+	return zero, nil
 }
 
 // TODO: реализуй AwaitTimeout
 func (f *Future[T]) AwaitTimeout(d time.Duration) (T, error, bool) {
-	select {
-	case <-f.done:
-		return f.value, f.err, true
-	case <-time.After(d):
-		var zero T
-		return zero, ErrFutureTimeout, false
-	}
+	var zero T
+	return zero, ErrFutureTimeout, false
 }
 
 // TODO: реализуй Done
 func (f *Future[T]) Done() <-chan struct{} {
-	return f.done
+	return nil
 }
 
-// TODO: реализуй Then — цепочка трансформаций
-// Возвращает новый Future который ждёт текущий, потом применяет fn
+// TODO: реализуй Then — цепочка: дождись текущего Future и примени fn к результату
 func (f *Future[T]) Then(fn func(T) T) *Future[T] {
-	return Async(func() (T, error) {
-		v, err := f.Await()
-		if err != nil {
-			return v, err
-		}
-		return fn(v), nil
-	})
+	return nil
 }
 
 func main() {

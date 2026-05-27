@@ -40,10 +40,10 @@ type entry[K comparable, V any] struct {
 }
 
 type LRUCache[K comparable, V any] struct {
-	mu       sync.RWMutex
-	cap      int
-	list     *list.List
-	items    map[K]*list.Element
+	mu    sync.RWMutex
+	cap   int
+	list  *list.List
+	items map[K]*list.Element
 }
 
 // TODO: реализуй NewLRUCache
@@ -56,44 +56,16 @@ func NewLRUCache[K comparable, V any](capacity int) *LRUCache[K, V] {
 }
 
 // TODO: реализуй Get
-// O(1): находим в map → перемещаем в начало списка → возвращаем значение
+// Подсказка: чтение тоже требует записи — подумай почему
 func (c *LRUCache[K, V]) Get(key K) (V, bool) {
-	c.mu.Lock() // Write lock потому что перемещаем элемент
-	defer c.mu.Unlock()
-
-	el, ok := c.items[key]
-	if !ok {
-		var zero V
-		return zero, false
-	}
-	c.list.MoveToFront(el)
-	return el.Value.(*entry[K, V]).value, true
+	var zero V
+	return zero, false
 }
 
 // TODO: реализуй Put
+// Подсказка: если ключ уже есть — обнови и повысь в приоритете;
+// если переполнено — вытесни least-recently-used
 func (c *LRUCache[K, V]) Put(key K, value V) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Ключ уже есть — обновляем и перемещаем в начало
-	if el, ok := c.items[key]; ok {
-		c.list.MoveToFront(el)
-		el.Value.(*entry[K, V]).value = value
-		return
-	}
-
-	// Добавляем новый
-	el := c.list.PushFront(&entry[K, V]{key: key, value: value})
-	c.items[key] = el
-
-	// Вытесняем хвост если переполнено
-	if c.list.Len() > c.cap {
-		tail := c.list.Back()
-		if tail != nil {
-			c.list.Remove(tail)
-			delete(c.items, tail.Value.(*entry[K, V]).key)
-		}
-	}
 }
 
 func (c *LRUCache[K, V]) Len() int {

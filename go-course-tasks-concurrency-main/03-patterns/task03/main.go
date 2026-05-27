@@ -46,69 +46,32 @@ func NewBroker[T any]() *Broker[T] {
 }
 
 // TODO: реализуй Subscribe
-// Создаёт буферизованный канал (cap 10), добавляет в список топика, возвращает канал
+// Подсказка: каждый подписчик — это отдельный канал; учти состояние closed
 func (b *Broker[T]) Subscribe(topic string) <-chan T {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.closed {
-		ch := make(chan T)
-		close(ch)
-		return ch
-	}
-	ch := make(chan T, 10)
-	b.subscribers[topic] = append(b.subscribers[topic], ch)
-	return ch
+	// TODO
+	return nil
 }
 
 // TODO: реализуй Unsubscribe
-// Удаляет канал ch из подписчиков топика, закрывает его
 func (b *Broker[T]) Unsubscribe(topic string, sub <-chan T) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	subs := b.subscribers[topic]
-	for i, ch := range subs {
-		if ch == sub {
-			// TODO: удали элемент i из среза, закрой ch
-			b.subscribers[topic] = append(subs[:i], subs[i+1:]...)
-			close(ch)
-			return
-		}
-	}
+	// TODO
 }
 
 // TODO: реализуй Publish
-// Отправляет сообщение всем подписчикам топика.
-// Если канал подписчика полон — пропускаем (не блокируемся).
+// Подсказка: медленный подписчик не должен блокировать остальных
 func (b *Broker[T]) Publish(topic string, msg T) {
-	b.mu.RLock()
-	subs := make([]chan T, len(b.subscribers[topic]))
-	copy(subs, b.subscribers[topic])
-	b.mu.RUnlock()
-
-	for _, ch := range subs {
-		select {
-		case ch <- msg:
-		default:
-			// подписчик не успевает — дропаем
-		}
-	}
+	// TODO
 }
 
 // TODO: реализуй Close
 func (b *Broker[T]) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.closed {
-		return
-	}
-	b.closed = true
-	for _, subs := range b.subscribers {
-		for _, ch := range subs {
-			close(ch)
-		}
-	}
-	b.subscribers = make(map[string][]chan T)
+	// TODO
 }
 
 func main() {

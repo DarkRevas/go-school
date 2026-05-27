@@ -30,7 +30,6 @@ package main
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
 
@@ -48,29 +47,16 @@ func process(in <-chan int) <-chan int {
 }
 
 // TODO: реализуй fanOut — раздай задачи n воркерам
-// Подсказка: используй sync.WaitGroup чтобы закрыть каналы воркеров
 func fanOut(in <-chan int, n int) []<-chan int {
 	channels := make([]<-chan int, n)
-	// TODO: создай n каналов
-	// TODO: запусти горутину которая распределяет данные из in по каналам round-robin
-	// TODO: закрой все каналы когда in закрыт
-	_ = in
+	// TODO
 	return channels
 }
 
 // TODO: реализуй fanIn — слей все каналы в один
-// Подсказка: на каждый входной канал запусти горутину
-// Используй sync.WaitGroup чтобы закрыть выходной канал
 func fanIn(channels ...<-chan int) <-chan int {
 	out := make(chan int)
-	var wg sync.WaitGroup
-
-	// TODO: для каждого канала запусти горутину которая читает и пишет в out
-	_ = wg
-	_ = channels
-
-	// TODO: когда все горутины завершатся — закрой out
-
+	// TODO
 	return out
 }
 

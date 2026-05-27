@@ -50,41 +50,29 @@ func newBarrier(n int) *barrier {
 	return b
 }
 
+// TODO: реализуй Wait
+// Подсказка: последний пришедший разбуждает всех, остальные ждут
 func (b *barrier) Wait() {
 	b.mu.Lock()
-	b.count++
-	if b.count == b.total {
-		b.count = 0
-		b.cond.Broadcast()
-	} else {
-		b.cond.Wait()
-	}
+	// TODO
 	b.mu.Unlock()
 }
 
+// TODO: реализуй NewH2O
+// Подсказка: семафоры ограничивают сколько атомов каждого типа собирается в одну "встречу",
+// а барьер синхронизирует их — подумай какие ёмкости нужны для H и O
 func NewH2O() *H2O {
-	h2o := &H2O{
-		hSem: make(chan struct{}, 2), // 2 водорода за раз
-		oSem: make(chan struct{}, 1), // 1 кислород за раз
-		bar:  newBarrier(3),
-	}
-	return h2o
+	return &H2O{}
 }
 
 // TODO: реализуй Hydrogen
 func (w *H2O) Hydrogen(fn func()) {
-	w.hSem <- struct{}{} // занять слот водорода
-	fn()
-	w.bar.Wait() // синхронизация с O и вторым H
-	<-w.hSem    // освободить слот
+	// TODO
 }
 
 // TODO: реализуй Oxygen
 func (w *H2O) Oxygen(fn func()) {
-	w.oSem <- struct{}{} // занять слот кислорода
-	fn()
-	w.bar.Wait() // синхронизация с двумя H
-	<-w.oSem    // освободить слот
+	// TODO
 }
 
 // === Тесты ===

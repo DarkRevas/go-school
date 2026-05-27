@@ -36,29 +36,27 @@ type FooBarChan struct {
 	barSem chan struct{}
 }
 
+// TODO: реализуй NewFooBarChan
+// Подсказка: два бинарных семафора (каналы ёмкостью 1); в один заранее положи токен — тот, кто стартует первым
 func NewFooBarChan(n int) *FooBarChan {
-	fb := &FooBarChan{
+	return &FooBarChan{
 		n:      n,
 		fooSem: make(chan struct{}, 1),
 		barSem: make(chan struct{}, 1),
 	}
-	fb.fooSem <- struct{}{} // Foo стартует первым
-	return fb
 }
 
+// TODO: реализуй Foo — жди разрешения, вызови fn, передай разрешение Bar
 func (fb *FooBarChan) Foo(fn func()) {
 	for range fb.n {
-		<-fb.fooSem
-		fn()
-		fb.barSem <- struct{}{}
+		// TODO
 	}
 }
 
+// TODO: реализуй Bar — жди разрешения от Foo, вызови fn, передай разрешение обратно Foo
 func (fb *FooBarChan) Bar(fn func()) {
 	for range fb.n {
-		<-fb.barSem
-		fn()
-		fb.fooSem <- struct{}{}
+		// TODO
 	}
 }
 
@@ -78,29 +76,16 @@ func NewFooBarMutex(n int) *FooBarMutex {
 }
 
 // TODO: реализуй Foo и Bar для варианта B
+// Подсказка: sync.Cond позволяет эффективно ожидать смены флага turn
 func (fb *FooBarMutex) Foo(fn func()) {
 	for range fb.n {
-		fb.mu.Lock()
-		for fb.turn != 0 {
-			fb.cond.Wait()
-		}
-		fn()
-		fb.turn = 1
-		fb.cond.Broadcast()
-		fb.mu.Unlock()
+		// TODO
 	}
 }
 
 func (fb *FooBarMutex) Bar(fn func()) {
 	for range fb.n {
-		fb.mu.Lock()
-		for fb.turn != 1 {
-			fb.cond.Wait()
-		}
-		fn()
-		fb.turn = 0
-		fb.cond.Broadcast()
-		fb.mu.Unlock()
+		// TODO
 	}
 }
 

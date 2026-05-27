@@ -33,8 +33,8 @@ import (
 )
 
 type entry[V any] struct {
-	value   V
-	expiry  time.Time
+	value  V
+	expiry time.Time
 }
 
 type TTLCache[K comparable, V any] struct {
@@ -55,15 +55,14 @@ func NewTTLCache[K comparable, V any](ttl time.Duration) *TTLCache[K, V] {
 func (c *TTLCache[K, V]) Set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// TODO: сохрани entry с expiry = time.Now().Add(c.ttl)
+	// TODO
 }
 
 // TODO: реализуй Get — возвращает значение если оно есть и не устарело
+// Подсказка: Get в основном читает — подумай какой Lock подойдёт
+// Отдельный вопрос: что делать если нашли устаревшую запись? Можно ли её удалить здесь?
 func (c *TTLCache[K, V]) Get(key K) (V, bool) {
-	c.mu.Lock() // TODO: поменяй на RLock, но нужен апгрейд до Lock если запись устарела
-	defer c.mu.Unlock()
-	// TODO: проверь entry.expiry.After(time.Now())
-	// Если устарело — удали из map и верни zero, false
+	// TODO
 	var zero V
 	return zero, false
 }
@@ -72,14 +71,14 @@ func (c *TTLCache[K, V]) Get(key K) (V, bool) {
 func (c *TTLCache[K, V]) Delete(key K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// TODO: delete(c.items, key)
+	// TODO
 }
 
-// TODO: реализуй Len — количество ЖИВЫХ записей
+// TODO: реализуй Len — количество ЖИВЫХ (не устаревших) записей
 func (c *TTLCache[K, V]) Len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	// TODO: считай только не устаревшие записи
+	// TODO
 	return 0
 }
 
@@ -87,12 +86,7 @@ func (c *TTLCache[K, V]) Len() int {
 func (c *TTLCache[K, V]) Cleanup() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	now := time.Now()
-	for k, e := range c.items {
-		if now.After(e.expiry) {
-			delete(c.items, k)
-		}
-	}
+	// TODO
 }
 
 func main() {

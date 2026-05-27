@@ -40,49 +40,15 @@ type TokenBucket struct {
 }
 
 // TODO: реализуй NewTokenBucket
-// Запусти горутину которая каждые interval добавляет 1 токен
+// Подсказка: фоновая горутина добавляет токены с нужной частотой; начинай с полным ведром
 func NewTokenBucket(rate float64, capacity int64) *TokenBucket {
-	interval := time.Duration(float64(time.Second) / rate)
-	tb := &TokenBucket{
-		capacity: capacity,
-		quit:     make(chan struct{}),
-	}
-	tb.tokens.Store(capacity) // начинаем с полным ведром
-
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				for {
-					cur := tb.tokens.Load()
-					if cur >= capacity {
-						break
-					}
-					if tb.tokens.CompareAndSwap(cur, cur+1) {
-						break
-					}
-				}
-			case <-tb.quit:
-				return
-			}
-		}
-	}()
-	return tb
+	return nil
 }
 
-// Allow забирает 1 токен. Возвращает false если ведро пусто.
+// TODO: Allow забирает 1 токен. Возвращает false если ведро пусто.
+// Подсказка: операция должна быть потокобезопасной без мьютекса
 func (tb *TokenBucket) Allow() bool {
-	for {
-		cur := tb.tokens.Load()
-		if cur <= 0 {
-			return false
-		}
-		if tb.tokens.CompareAndSwap(cur, cur-1) {
-			return true
-		}
-	}
+	return false
 }
 
 func (tb *TokenBucket) Close() { close(tb.quit) }
@@ -99,33 +65,14 @@ type LazyTokenBucket struct {
 
 // TODO: реализуй NewLazyTokenBucket
 func NewLazyTokenBucket(rate, capacity float64) *LazyTokenBucket {
-	return &LazyTokenBucket{
-		tokens:     capacity,
-		capacity:   capacity,
-		rate:       rate,
-		lastRefill: time.Now(),
-	}
+	return nil
 }
 
 // TODO: реализуй Allow для LazyTokenBucket
-// При каждом вызове:
-//   1. Вычисли сколько токенов накопилось с lastRefill
-//   2. Добавь к tokens (но не больше capacity)
-//   3. Обнови lastRefill
-//   4. Если tokens >= 1 — забери токен и верни true
+// Подсказка: горутина не нужна — используй lastRefill и time.Since между вызовами
 func (lb *LazyTokenBucket) Allow() bool {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-
-	now := time.Now()
-	elapsed := now.Sub(lb.lastRefill).Seconds()
-	lb.tokens = min(lb.capacity, lb.tokens+elapsed*lb.rate)
-	lb.lastRefill = now
-
-	if lb.tokens >= 1 {
-		lb.tokens--
-		return true
-	}
 	return false
 }
 
