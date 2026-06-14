@@ -25,6 +25,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"sync"
 )
 
 // TODO: реализуй merge2
@@ -35,6 +36,24 @@ func merge2(a, b <-chan int) <-chan int {
 	go func() {
 		defer close(out)
 		// TODO
+		for a != nil || b != nil {
+            select {
+            case v, ok := <-a:
+                if !ok {
+                    a = nil
+                    continue
+                }
+                out <- v
+
+            case v, ok := <-b:
+                if !ok {
+                    b = nil
+                    continue
+                }
+                out <- v
+            }
+        }
+		
 	}()
 	return out
 }
@@ -43,9 +62,27 @@ func merge2(a, b <-chan int) <-chan int {
 // Подсказка: запусти по горутине на каждый канал; нужна синхронизация чтобы
 // понять когда все каналы иссякли — только после этого можно закрыть out
 func mergeN(channels ...<-chan int) <-chan int {
-	out := make(chan int)
-	// TODO
-	return out
+    out := make(chan int)
+
+    var wg sync.WaitGroup
+    wg.Add(len(channels))
+
+    for _, ch := range channels {
+        go func() {
+            defer wg.Done()
+
+            for v := range ch {
+                out <- v
+            }
+        }()
+    }
+
+    go func() {
+        wg.Wait()
+        close(out)
+    }()
+
+    return out
 }
 
 // TODO: реализуй mergeOrdered — сохрани порядок внутри каждого канала
@@ -53,7 +90,7 @@ func mergeN(channels ...<-chan int) <-chan int {
 // Подумай: если горутина читает из канала последовательно — может ли она нарушить порядок?
 func mergeOrdered(channels ...<-chan int) <-chan int {
 	// TODO
-	return nil
+	return mergeN(channels...)
 }
 
 func sourceChan(nums ...int) <-chan int {
