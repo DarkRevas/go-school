@@ -51,7 +51,18 @@ func NewBarrier(n int) *Barrier {
 func (b *Barrier) Wait() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	// TODO
+
+	myPhase := b.phase.Load()
+	if int(b.count.Add(1)) == b.n {
+		b.count.Store(0)
+		b.phase.Add(1)
+		b.cond.Broadcast()
+		return
+	}
+
+	for b.phase.Load() == myPhase {
+		b.cond.Wait()
+	}
 }
 
 func main() {

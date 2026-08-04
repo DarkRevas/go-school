@@ -61,13 +61,9 @@ var (
 
 // TODO: реализуй GetDB_Once
 func GetDB_Once() *MockDB {
-	// TODO
 	onceDB.Do(func() {
-		if singleDB == nil {
-			singleDB = NewMockDB()
-		}
+		singleDB = NewMockDB()
 	})
-	
 	return singleDB
 }
 

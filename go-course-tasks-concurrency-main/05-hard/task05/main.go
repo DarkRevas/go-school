@@ -58,14 +58,37 @@ func NewLRUCache[K comparable, V any](capacity int) *LRUCache[K, V] {
 // TODO: реализуй Get
 // Подсказка: чтение тоже требует записи — подумай почему
 func (c *LRUCache[K, V]) Get(key K) (V, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	var zero V
-	return zero, false
+	el, ok := c.items[key]
+	if !ok {
+		return zero, false
+	}
+	c.list.MoveToFront(el)
+	return el.Value.(*entry[K, V]).value, true
 }
 
 // TODO: реализуй Put
 // Подсказка: если ключ уже есть — обнови и повысь в приоритете;
 // если переполнено — вытесни least-recently-used
 func (c *LRUCache[K, V]) Put(key K, value V) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if el, ok := c.items[key]; ok {
+		el.Value.(*entry[K, V]).value = value
+		c.list.MoveToFront(el)
+		return
+	}
+	el := c.list.PushFront(&entry[K, V]{key: key, value: value})
+	c.items[key] = el
+	if c.list.Len() > c.cap {
+		tail := c.list.Back()
+		if tail != nil {
+			c.list.Remove(tail)
+			delete(c.items, tail.Value.(*entry[K, V]).key)
+		}
+	}
 }
 
 func (c *LRUCache[K, V]) Len() int {

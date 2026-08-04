@@ -58,26 +58,86 @@ func NewBlockingQueue[T any](capacity int) *BlockingQueue[T] {
 func (q *BlockingQueue[T]) Put(item T) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	// TODO: жди пока есть место, учитывай состояние closed
+	for len(q.items) == q.cap && !q.closed {
+		q.notFull.Wait()
+	}
+	if q.closed {
+		return
+	}
+	q.items = append(q.items, item)
+	q.notEmpty.Signal()
 }
 
 // TODO: реализуй Take — блокируется пока len(items) == 0
 func (q *BlockingQueue[T]) Take() (zero T) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	// TODO: жди пока есть что читать, учитывай состояние closed
-	return zero
+	for len(q.items) == 0 && !q.closed {
+		q.notEmpty.Wait()
+	}
+	if len(q.items) == 0 {
+		return zero
+	}
+	item := q.items[0]
+	q.items = q.items[1:]
+	q.notFull.Signal()
+	return item
 }
 
 // TODO: реализуй PutTimeout
 // Подсказка: нужен способ принудительно разбудить заблокированных по истечению таймаута
 func (q *BlockingQueue[T]) PutTimeout(item T, d time.Duration) bool {
-	return false
+	timer := time.AfterFunc(d, func() {
+		q.mu.Lock()
+		q.notFull.Broadcast()
+		q.mu.Unlock()
+	})
+	defer timer.Stop()
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	deadline := time.Now().Add(d)
+	for len(q.items) == q.cap && !q.closed {
+		if time.Now().After(deadline) {
+			return false
+		}
+		q.notFull.Wait()
+	}
+	if q.closed || len(q.items) == q.cap {
+		return false
+	}
+	q.items = append(q.items, item)
+	q.notEmpty.Signal()
+	return true
 }
 
 // TODO: реализуй TakeTimeout аналогично PutTimeout
 func (q *BlockingQueue[T]) TakeTimeout(d time.Duration) (zero T, ok bool) {
-	return zero, false
+	timer := time.AfterFunc(d, func() {
+		q.mu.Lock()
+		q.notEmpty.Broadcast()
+		q.mu.Unlock()
+	})
+	defer timer.Stop()
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	deadline := time.Now().Add(d)
+	for len(q.items) == 0 && !q.closed {
+		if time.Now().After(deadline) {
+			return zero, false
+		}
+		q.notEmpty.Wait()
+	}
+	if len(q.items) == 0 {
+		return zero, false
+	}
+	item := q.items[0]
+	q.items = q.items[1:]
+	q.notFull.Signal()
+	return item, true
 }
 
 func (q *BlockingQueue[T]) Len() int {
@@ -90,7 +150,11 @@ func (q *BlockingQueue[T]) Len() int {
 // Подсказка: у sync.Cond есть разные способы пробуждения — выбери подходящий
 // для ситуации "заблокированных может быть много, и все должны проснуться"
 func (q *BlockingQueue[T]) Close() {
-	// TODO
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.closed = true
+	q.notFull.Broadcast()
+	q.notEmpty.Broadcast()
 }
 
 func main() {

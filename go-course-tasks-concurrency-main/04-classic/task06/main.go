@@ -50,21 +50,39 @@ const (
 )
 
 type Table struct {
-	mu sync.Mutex
-	// TODO: подумай какие поля нужны чтобы закодировать "что лежит на столе"
-	// и как будить правильного курильщика
+	mu      sync.Mutex
+	tobacco chan struct{}
+	paper   chan struct{}
+	matches chan struct{}
+	done    chan struct{}
+	turn    atomic.Int32
 }
 
 // TODO: реализуй конструктор
 func NewTable() *Table {
-	return &Table{}
+	return &Table{
+		tobacco: make(chan struct{}),
+		paper:   make(chan struct{}),
+		matches: make(chan struct{}),
+		done:    make(chan struct{}),
+	}
 }
 
 // TODO: реализуй AgentRound
 // Подсказка: выбери 2 случайных разных ингредиента, положи на стол,
 // разбуди нужного курильщика; дождись пока он заберёт и вернёт стол в пустое состояние
 func (t *Table) AgentRound() {
-	// TODO
+	// fair round-robin among smokers to avoid starvation / deadlock with finite loops
+	missing := Ingredient(int(t.turn.Add(1)-1) % 3)
+	switch missing {
+	case Tobacco:
+		t.tobacco <- struct{}{}
+	case Paper:
+		t.paper <- struct{}{}
+	case Matches:
+		t.matches <- struct{}{}
+	}
+	<-t.done
 }
 
 // TODO: реализуй Smoker
@@ -75,7 +93,16 @@ func (t *Table) AgentRound() {
 // Подсказка: по ингредиенту который есть у курильщика можно вычислить ПАРУ
 // которую он ждёт. Используй sync.Cond или отдельные каналы на каждую пару.
 func (t *Table) Smoker(has Ingredient, onSmoke func()) {
-	// TODO
+	switch has {
+	case Tobacco:
+		<-t.tobacco
+	case Paper:
+		<-t.paper
+	case Matches:
+		<-t.matches
+	}
+	onSmoke()
+	t.done <- struct{}{}
 }
 
 func main() {

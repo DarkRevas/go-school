@@ -53,18 +53,28 @@ type Debouncer struct {
 
 // TODO: реализуй NewDebouncer
 func NewDebouncer(d time.Duration, fn func()) *Debouncer {
-	return nil
+	return &Debouncer{d: d, fn: fn}
 }
 
 // TODO: реализуй Trigger
 // Подсказка: time.Timer умеет Reset — используй его. Stop+new также работает.
 func (db *Debouncer) Trigger() {
-	// TODO
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	if db.timer != nil {
+		db.timer.Stop()
+	}
+	db.timer = time.AfterFunc(db.d, db.fn)
 }
 
 // TODO: реализуй Stop
 func (db *Debouncer) Stop() {
-	// TODO
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	if db.timer != nil {
+		db.timer.Stop()
+		db.timer = nil
+	}
 }
 
 // === Throttler ===
@@ -77,14 +87,21 @@ type Throttler struct {
 
 // TODO: реализуй NewThrottler
 func NewThrottler(d time.Duration, fn func()) *Throttler {
-	return nil
+	return &Throttler{d: d, fn: fn}
 }
 
 // TODO: реализуй Trigger
 // Подсказка: запомни время последнего успешного вызова и используй CAS
 // для атомарной проверки "прошло ли d с прошлого раза"
 func (t *Throttler) Trigger() {
-	// TODO
+	now := time.Now().UnixNano()
+	last := t.lastNs.Load()
+	if now-last < int64(t.d) {
+		return
+	}
+	if t.lastNs.CompareAndSwap(last, now) {
+		t.fn()
+	}
 }
 
 func main() {

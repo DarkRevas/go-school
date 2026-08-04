@@ -83,8 +83,17 @@ type Scheduler struct {
 // Подсказка: проинициализируй поля (tasks, jobs, done) и запусти workers горутин s.worker()
 // Не забудь про s.wg чтобы Shutdown мог дождаться завершения
 func NewScheduler(workers int) *Scheduler {
-	// TODO
-	return nil
+	s := &Scheduler{
+		tasks:   make(map[TaskID]*taskState),
+		workers: workers,
+		jobs:    make(chan *taskState, 64),
+		done:    make(chan struct{}),
+	}
+	s.wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go s.worker()
+	}
+	return s
 }
 
 // TODO: реализуй worker — читает из s.jobs, запускает ts.task.Fn(ts.ctx)
@@ -93,18 +102,105 @@ func NewScheduler(workers int) *Scheduler {
 // И реагируй на s.done чтобы выйти при Shutdown
 func (s *Scheduler) worker() {
 	defer s.wg.Done()
-	// TODO
+	for {
+		select {
+		case <-s.done:
+			return
+		case ts, ok := <-s.jobs:
+			if !ok {
+				return
+			}
+			if ts.ctx.Err() != nil {
+				ts.err = ts.ctx.Err()
+				atomic.AddInt64(&s.stats.Cancelled, 1)
+				close(ts.done)
+				continue
+			}
+			err := ts.task.Fn(ts.ctx)
+			ts.err = err
+			if err != nil {
+				if ts.ctx.Err() != nil {
+					atomic.AddInt64(&s.stats.Cancelled, 1)
+				} else {
+					atomic.AddInt64(&s.stats.Failed, 1)
+				}
+			} else {
+				atomic.AddInt64(&s.stats.Completed, 1)
+			}
+			close(ts.done)
+		}
+	}
+}
+
+func (s *Scheduler) enqueue(ts *taskState) {
+	select {
+	case <-s.done:
+		ts.cancel()
+		ts.err = context.Canceled
+		atomic.AddInt64(&s.stats.Cancelled, 1)
+		close(ts.done)
+	case s.jobs <- ts:
+	}
 }
 
 // TODO: реализуй Schedule
 // Подсказка: если есть DependsOn — жди зависимости асинхронно; Deadline — через context
 func (s *Scheduler) Schedule(task Task) TaskID {
-	return 0
+	id := TaskID(s.nextID.Add(1))
+	task.ID = id
+
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if !task.Deadline.IsZero() {
+		ctx, cancel = context.WithDeadline(context.Background(), task.Deadline)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+
+	ts := &taskState{
+		task:     task,
+		ctx:      ctx,
+		cancel:   cancel,
+		done:     make(chan struct{}),
+		queuedAt: time.Now(),
+	}
+
+	s.mu.Lock()
+	s.tasks[id] = ts
+	s.mu.Unlock()
+
+	go func() {
+		for _, depID := range task.DependsOn {
+			if err := s.Wait(depID); err != nil {
+				ts.cancel()
+				ts.err = err
+				atomic.AddInt64(&s.stats.Failed, 1)
+				close(ts.done)
+				return
+			}
+		}
+		if ctx.Err() != nil {
+			ts.err = ctx.Err()
+			atomic.AddInt64(&s.stats.Cancelled, 1)
+			close(ts.done)
+			return
+		}
+		s.enqueue(ts)
+	}()
+
+	return id
 }
 
 // TODO: реализуй Cancel
 func (s *Scheduler) Cancel(id TaskID) bool {
-	return false
+	s.mu.Lock()
+	ts, ok := s.tasks[id]
+	s.mu.Unlock()
+	if !ok {
+		return false
+	}
+	ts.cancel()
+	return true
 }
 
 // Wait блокируется до завершения задачи
@@ -123,7 +219,8 @@ func (s *Scheduler) Wait(id TaskID) error {
 // Подсказка: закрытие s.done сигнализирует всем воркерам о выходе
 // Не закрывай s.jobs — в него могут писать горутины зависимостей
 func (s *Scheduler) Shutdown() {
-	// TODO
+	close(s.done)
+	s.wg.Wait()
 }
 
 func (s *Scheduler) Stats() Stats {
@@ -179,4 +276,5 @@ func main() {
 	stats := sched.Stats()
 	fmt.Printf("Выполнено: %d, Ошибок: %d, Отменено: %d\n",
 		stats.Completed, stats.Failed, stats.Cancelled)
+	sched.Shutdown()
 }

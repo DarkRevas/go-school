@@ -34,29 +34,59 @@ type Semaphore struct {
 // NewSemaphore создаёт семафор с ёмкостью n.
 // Подсказка: сам канал представляет токены
 func NewSemaphore(n int) *Semaphore {
-	return &Semaphore{}
+	ch := make(chan struct{}, n)
+	for i := 0; i < n; i++ {
+		ch <- struct{}{}
+	}
+	return &Semaphore{ch: ch}
 }
 
 // Acquire блокирующий захват n единиц.
 // TODO: реализуй
 func (s *Semaphore) Acquire(n int) {
+	for i := 0; i < n; i++ {
+		<-s.ch
+	}
 }
 
 // AcquireContext захват с контекстом — можно отменить.
 // TODO: если отмена настигнет в середине — верни уже захваченное и верни ошибку
 func (s *Semaphore) AcquireContext(ctx context.Context, n int) error {
+	acquired := 0
+	for i := 0; i < n; i++ {
+		select {
+		case <-s.ch:
+			acquired++
+		case <-ctx.Done():
+			s.Release(acquired)
+			return ctx.Err()
+		}
+	}
 	return nil
 }
 
 // TryAcquire non-blocking захват. Возвращает false если доступно < n.
 // TODO: необходимо попытаться захватить не блокируясь; если не удалось — откатить всё что уже взяли
 func (s *Semaphore) TryAcquire(n int) bool {
-	return false
+	acquired := 0
+	for i := 0; i < n; i++ {
+		select {
+		case <-s.ch:
+			acquired++
+		default:
+			s.Release(acquired)
+			return false
+		}
+	}
+	return true
 }
 
 // Release возвращает n единиц.
 // TODO: реализуй
 func (s *Semaphore) Release(n int) {
+	for i := 0; i < n; i++ {
+		s.ch <- struct{}{}
+	}
 }
 
 // Available возвращает количество свободных единиц.

@@ -52,27 +52,81 @@ type Actor[S any] struct {
 // TODO: реализуй NewActor
 // Подсказка: запусти run() в горутине — она обрабатывает все сообщения последовательно
 func NewActor[S any](initial S) *Actor[S] {
-	return nil
+	a := &Actor[S]{
+		state:   initial,
+		mailbox: make(chan message[S], 64),
+		done:    make(chan struct{}),
+	}
+	go a.run()
+	return a
 }
 
 // TODO: реализуй run — бесконечный цикл обработки сообщений из mailbox
 // Подсказка: message может быть двух видов (fn или ask) — для ask нужно отправить результат в replyCh
 // Цикл должен завершаться при закрытии a.done
 func (a *Actor[S]) run() {
-	// TODO
+	for {
+		select {
+		case <-a.done:
+			for {
+				select {
+				case msg := <-a.mailbox:
+					a.handle(msg)
+				default:
+					return
+				}
+			}
+		case msg := <-a.mailbox:
+			a.handle(msg)
+		}
+	}
+}
+
+func (a *Actor[S]) handle(msg message[S]) {
+	if msg.ask != nil {
+		msg.replyCh <- msg.ask(&a.state)
+		return
+	}
+	if msg.fn != nil {
+		msg.fn(&a.state)
+	}
 }
 
 // TODO: реализуй Send — fire-and-forget; учитывай что actor может быть остановлен
 func (a *Actor[S]) Send(fn func(state *S)) {
+	select {
+	case <-a.done:
+		return
+	case a.mailbox <- message[S]{fn: fn}:
+	}
 }
 
 // TODO: реализуй Ask — запрос с ожиданием ответа
 func (a *Actor[S]) Ask(fn func(state *S) any) any {
-	return nil
+	reply := make(chan any, 1)
+	select {
+	case <-a.done:
+		return nil
+	case a.mailbox <- message[S]{ask: fn, replyCh: reply}:
+	}
+	select {
+	case <-a.done:
+		select {
+		case v := <-reply:
+			return v
+		default:
+			return nil
+		}
+	case v := <-reply:
+		return v
+	}
 }
 
 // TODO: реализуй Stop
 func (a *Actor[S]) Stop() {
+	a.once.Do(func() {
+		close(a.done)
+	})
 }
 
 // === Пример: Банковский счёт без мьютекса ===
@@ -139,9 +193,10 @@ func main() {
 	}
 
 	wg.Wait()
+	bal := Balance(account)
 	account.Stop()
 
-	fmt.Printf("Баланс: %.2f\n", Balance(account))
+	fmt.Printf("Баланс: %.2f\n", bal)
 	fmt.Printf("Успешных снятий: %d\n", successWithdrawals.Load())
 	// Баланс не должен уйти в минус!
 }

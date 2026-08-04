@@ -43,8 +43,29 @@ type Group[T any] struct {
 // TODO: реализуй Do
 // Подсказка: если вызов с таким ключом уже есть — не запускай fn снова, дождись результата первого
 func (g *Group[T]) Do(key string, fn func() (T, error)) (T, error, bool) {
-	var zero T
-	return zero, nil, false
+	g.mu.Lock()
+	if g.calls == nil {
+		g.calls = make(map[string]*call[T])
+	}
+	if c, ok := g.calls[key]; ok {
+		g.mu.Unlock()
+		c.wg.Wait()
+		return c.val, c.err, true
+	}
+
+	c := &call[T]{}
+	c.wg.Add(1)
+	g.calls[key] = c
+	g.mu.Unlock()
+
+	c.val, c.err = fn()
+	c.wg.Done()
+
+	g.mu.Lock()
+	delete(g.calls, key)
+	g.mu.Unlock()
+
+	return c.val, c.err, false
 }
 
 func main() {
