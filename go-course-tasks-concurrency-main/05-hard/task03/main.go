@@ -94,20 +94,107 @@ func NewPool(maxConn int, factory func() (Conn, error)) *Pool {
 	return p
 }
 
+func (p *Pool) takeIdleHealthy() (Conn, bool) {
+	for len(p.idle) > 0 {
+		conn := p.idle[len(p.idle)-1]
+		p.idle = p.idle[:len(p.idle)-1]
+		if conn.Ping() == nil {
+			return conn, true
+		}
+		_ = conn.Close()
+	}
+	return nil, false
+}
+
 // TODO: реализуй Acquire
 // Подсказка: три сценария: idle есть, можно создать, нужно ждать
 // Отмена ctx должна разбудить ожидающего — подумай как
 func (p *Pool) Acquire(ctx context.Context) (Conn, error) {
-	return nil, ErrPoolClosed
+	for {
+		p.mu.Lock()
+		if p.closed {
+			p.mu.Unlock()
+			return nil, ErrPoolClosed
+		}
+
+		if conn, ok := p.takeIdleHealthy(); ok {
+			p.inUse++
+			p.mu.Unlock()
+			p.acquired.Add(1)
+			return conn, nil
+		}
+
+		if p.inUse+len(p.idle) < p.maxConn {
+			p.inUse++
+			factory := p.factory
+			p.mu.Unlock()
+			conn, err := factory()
+			if err != nil {
+				p.mu.Lock()
+				p.inUse--
+				p.cond.Signal()
+				p.mu.Unlock()
+				return nil, err
+			}
+			p.acquired.Add(1)
+			return conn, nil
+		}
+
+		waitCh := make(chan struct{})
+		go func() {
+			select {
+			case <-ctx.Done():
+				p.mu.Lock()
+				p.cond.Broadcast()
+				p.mu.Unlock()
+			case <-waitCh:
+			}
+		}()
+
+		p.cond.Wait()
+		close(waitCh)
+		p.mu.Unlock()
+
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+	}
 }
 
 // TODO: реализуй Release
 // Подсказка: после возврата нужно разбудить ожидающего
 func (p *Pool) Release(conn Conn) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		_ = conn.Close()
+		p.inUse--
+		p.cond.Broadcast()
+		return
+	}
+	p.inUse--
+	p.idle = append(p.idle, conn)
+	p.released.Add(1)
+	p.cond.Signal()
 }
 
 // TODO: реализуй Close
 func (p *Pool) Close() {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return
+	}
+	p.closed = true
+	for _, c := range p.idle {
+		_ = c.Close()
+	}
+	p.idle = nil
+	p.cond.Broadcast()
+	for p.inUse > 0 {
+		p.cond.Wait()
+	}
+	p.mu.Unlock()
 }
 
 func (p *Pool) Stats() PoolStats {

@@ -44,27 +44,61 @@ type Group struct {
 // TODO: реализуй WithContext
 // Подсказка: нужен производный context.WithCancel; cancel вызывается при ПЕРВОЙ ошибке
 func WithContext(ctx context.Context) (*Group, context.Context) {
-	// TODO
-	return nil, ctx
+	ctx, cancel := context.WithCancel(ctx)
+	return &Group{cancel: cancel}, ctx
 }
 
 // TODO: реализуй Go
 // Подсказка: учитывай лимит (sem) — если задан, он ограничивает число параллельных вызовов
 // При ошибке — запомни первую (errOnce) и отмени ctx
 func (g *Group) Go(fn func() error) {
-	// TODO
+	if g.sem != nil {
+		g.sem <- struct{}{}
+	}
+	g.wg.Add(1)
+	go func() {
+		defer g.wg.Done()
+		if g.sem != nil {
+			defer func() { <-g.sem }()
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				g.errOnce.Do(func() {
+					g.err = fmt.Errorf("panic: %v", r)
+					if g.cancel != nil {
+						g.cancel()
+					}
+				})
+			}
+		}()
+		if err := fn(); err != nil {
+			g.errOnce.Do(func() {
+				g.err = err
+				if g.cancel != nil {
+					g.cancel()
+				}
+			})
+		}
+	}()
 }
 
 // TODO: реализуй Wait
 func (g *Group) Wait() error {
-	// TODO
+	g.wg.Wait()
+	if g.cancel != nil {
+		g.cancel()
+	}
 	return g.err
 }
 
 // TODO: реализуй SetLimit — после вызова Go ограничивает N параллельных
 // Если задать 0 или отрицательное — сброс лимита
 func (g *Group) SetLimit(n int) {
-	// TODO
+	if n <= 0 {
+		g.sem = nil
+		return
+	}
+	g.sem = make(chan struct{}, n)
 }
 
 func main() {

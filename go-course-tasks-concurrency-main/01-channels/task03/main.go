@@ -41,6 +41,23 @@ func withDone(done <-chan struct{}, in <-chan int) <-chan int {
 	go func() {
 		defer close(out)
 		// TODO
+
+		for {
+			select {
+				case <-done:
+					return
+				case v, ok := <-in:
+					if !ok {
+						return
+					}
+					select {
+					case <- done:
+						return 
+					case out <- v:
+					}
+				
+			}
+		}
 	}()
 	return out
 }
@@ -50,6 +67,14 @@ func generate(done <-chan struct{}, nums ...int) <-chan int {
 	go func() {
 		defer close(out)
 		// TODO: защити отправку каждого числа от блокировки при отмене
+		for _, n := range nums {
+			select {
+			case <-done:
+				return
+
+			case out <- n:
+			}
+		}
 	}()
 	return out
 }
@@ -60,6 +85,21 @@ func square(done <-chan struct{}, in <-chan int) <-chan int {
 	go func() {
 		defer close(out)
 		// TODO: аналогично generate, но читаем из канала, а не из среза
+		for {
+			select {
+			case <-done:
+				return
+			case n, ok := <-in:
+				if !ok {
+					return
+				}
+				select {
+				case <-done:
+					return
+				case out <- n*n:
+				}
+			}
+		}
 	}()
 	return out
 }

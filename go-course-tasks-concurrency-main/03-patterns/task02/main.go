@@ -42,13 +42,48 @@ type TokenBucket struct {
 // TODO: реализуй NewTokenBucket
 // Подсказка: фоновая горутина добавляет токены с нужной частотой; начинай с полным ведром
 func NewTokenBucket(rate float64, capacity int64) *TokenBucket {
-	return nil
+	tb := &TokenBucket{
+		capacity: capacity,
+		quit:     make(chan struct{}),
+	}
+	tb.tokens.Store(capacity)
+
+	interval := time.Duration(float64(time.Second) / rate)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				for {
+					cur := tb.tokens.Load()
+					if cur >= tb.capacity {
+						break
+					}
+					if tb.tokens.CompareAndSwap(cur, cur+1) {
+						break
+					}
+				}
+			case <-tb.quit:
+				return
+			}
+		}
+	}()
+	return tb
 }
 
 // TODO: Allow забирает 1 токен. Возвращает false если ведро пусто.
 // Подсказка: операция должна быть потокобезопасной без мьютекса
 func (tb *TokenBucket) Allow() bool {
-	return false
+	for {
+		cur := tb.tokens.Load()
+		if cur <= 0 {
+			return false
+		}
+		if tb.tokens.CompareAndSwap(cur, cur-1) {
+			return true
+		}
+	}
 }
 
 func (tb *TokenBucket) Close() { close(tb.quit) }
@@ -65,7 +100,12 @@ type LazyTokenBucket struct {
 
 // TODO: реализуй NewLazyTokenBucket
 func NewLazyTokenBucket(rate, capacity float64) *LazyTokenBucket {
-	return nil
+	return &LazyTokenBucket{
+		tokens:     capacity,
+		capacity:   capacity,
+		rate:       rate,
+		lastRefill: time.Now(),
+	}
 }
 
 // TODO: реализуй Allow для LazyTokenBucket
@@ -73,7 +113,17 @@ func NewLazyTokenBucket(rate, capacity float64) *LazyTokenBucket {
 func (lb *LazyTokenBucket) Allow() bool {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-	return false
+
+	now := time.Now()
+	elapsed := now.Sub(lb.lastRefill).Seconds()
+	lb.tokens = min(lb.capacity, lb.tokens+elapsed*lb.rate)
+	lb.lastRefill = now
+
+	if lb.tokens < 1 {
+		return false
+	}
+	lb.tokens--
+	return true
 }
 
 func min(a, b float64) float64 {

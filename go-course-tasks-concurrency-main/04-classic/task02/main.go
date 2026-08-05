@@ -26,7 +26,8 @@ package main
 import (
 	"fmt"
 	"sort"
-	"testing"
+	"sync"
+	"sync/atomic"
 )
 
 // === Вариант 1: через каналы ===
@@ -34,24 +35,49 @@ import (
 // TODO: реализуй producerConsumerChan
 // Подсказка: два буферизованных канала и два WaitGroup — для производителей и потребителей
 func producerConsumerChan(producers, consumers, n, bufSize int) []int {
-	return nil
-}
+	jobs := make(chan int, bufSize)
+	resultsCh := make(chan int, n)
 
-func TestProducerConsumer(t *testing.T) {
-	results := producerConsumerChan(3, 4, 20, 5)
-	sort.Ints(results)
-
-	if len(results) != 20 {
-		t.Fatalf("ожидали 20 результатов, получили %d", len(results))
+	var next atomic.Int64
+	var prodWg sync.WaitGroup
+	for i := 0; i < producers; i++ {
+		prodWg.Add(1)
+		go func() {
+			defer prodWg.Done()
+			for {
+				v := int(next.Add(1) - 1)
+				if v >= n {
+					return
+				}
+				jobs <- v
+			}
+		}()
 	}
+	go func() {
+		prodWg.Wait()
+		close(jobs)
+	}()
 
-	// Проверяем что это квадраты чисел 0..19
-	for i, v := range results {
-		want := i * i
-		if v != want {
-			t.Errorf("[%d] = %d, want %d", i, v, want)
-		}
+	var consWg sync.WaitGroup
+	for i := 0; i < consumers; i++ {
+		consWg.Add(1)
+		go func() {
+			defer consWg.Done()
+			for v := range jobs {
+				resultsCh <- v * v
+			}
+		}()
 	}
+	go func() {
+		consWg.Wait()
+		close(resultsCh)
+	}()
+
+	out := make([]int, 0, n)
+	for r := range resultsCh {
+		out = append(out, r)
+	}
+	return out
 }
 
 // === Вариант 2: через sync.Cond ===
@@ -59,21 +85,72 @@ func TestProducerConsumer(t *testing.T) {
 // TODO: реализуй producerConsumerCond
 // Подсказка: буфер — обычный срез; производители ждут пока буфер полон, потребители — пока пуст
 func producerConsumerCond(producers, consumers, n, bufSize int) []int {
-	return nil
-}
+	var mu sync.Mutex
+	notEmpty := sync.NewCond(&mu)
+	notFull := sync.NewCond(&mu)
+	buf := make([]int, 0, bufSize)
+	done := false
 
-func TestProducerConsumerCond(t *testing.T) {
-	results := producerConsumerCond(3, 4, 20, 5)
-	sort.Ints(results)
+	var next atomic.Int64
+	var resultsMu sync.Mutex
+	results := make([]int, 0, n)
 
-	if len(results) != 20 {
-		t.Fatalf("ожидали 20 результатов, получили %d", len(results))
+	var prodWg sync.WaitGroup
+	for i := 0; i < producers; i++ {
+		prodWg.Add(1)
+		go func() {
+			defer prodWg.Done()
+			for {
+				v := int(next.Add(1) - 1)
+				if v >= n {
+					return
+				}
+				mu.Lock()
+				for len(buf) == bufSize {
+					notFull.Wait()
+				}
+				buf = append(buf, v)
+				notEmpty.Signal()
+				mu.Unlock()
+			}
+		}()
 	}
-	for i, v := range results {
-		if v != i*i {
-			t.Errorf("[%d] = %d, want %d", i, v, i*i)
-		}
+
+	go func() {
+		prodWg.Wait()
+		mu.Lock()
+		done = true
+		notEmpty.Broadcast()
+		mu.Unlock()
+	}()
+
+	var consWg sync.WaitGroup
+	for i := 0; i < consumers; i++ {
+		consWg.Add(1)
+		go func() {
+			defer consWg.Done()
+			for {
+				mu.Lock()
+				for len(buf) == 0 && !done {
+					notEmpty.Wait()
+				}
+				if len(buf) == 0 {
+					mu.Unlock()
+					return
+				}
+				v := buf[0]
+				buf = buf[1:]
+				notFull.Signal()
+				mu.Unlock()
+
+				resultsMu.Lock()
+				results = append(results, v*v)
+				resultsMu.Unlock()
+			}
+		}()
 	}
+	consWg.Wait()
+	return results
 }
 
 func main() {

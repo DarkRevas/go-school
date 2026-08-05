@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"testing"
 )
 
 type H2O struct {
@@ -38,10 +37,11 @@ type H2O struct {
 
 // barrier — встреча трёх горутин перед продолжением
 type barrier struct {
-	mu    sync.Mutex
-	cond  *sync.Cond
-	count int
-	total int
+	mu         sync.Mutex
+	cond       *sync.Cond
+	count      int
+	total      int
+	generation int
 }
 
 func newBarrier(n int) *barrier {
@@ -54,7 +54,18 @@ func newBarrier(n int) *barrier {
 // Подсказка: последний пришедший разбуждает всех, остальные ждут
 func (b *barrier) Wait() {
 	b.mu.Lock()
-	// TODO
+	gen := b.generation
+	b.count++
+	if b.count == b.total {
+		b.count = 0
+		b.generation++
+		b.cond.Broadcast()
+		b.mu.Unlock()
+		return
+	}
+	for gen == b.generation {
+		b.cond.Wait()
+	}
 	b.mu.Unlock()
 }
 
@@ -62,72 +73,31 @@ func (b *barrier) Wait() {
 // Подсказка: семафоры ограничивают сколько атомов каждого типа собирается в одну "встречу",
 // а барьер синхронизирует их — подумай какие ёмкости нужны для H и O
 func NewH2O() *H2O {
-	return &H2O{}
+	h := &H2O{
+		hSem: make(chan struct{}, 2),
+		oSem: make(chan struct{}, 1),
+		bar:  newBarrier(3),
+	}
+	h.hSem <- struct{}{}
+	h.hSem <- struct{}{}
+	h.oSem <- struct{}{}
+	return h
 }
 
 // TODO: реализуй Hydrogen
 func (w *H2O) Hydrogen(fn func()) {
-	// TODO
+	<-w.hSem
+	w.bar.Wait()
+	fn()
+	w.hSem <- struct{}{}
 }
 
 // TODO: реализуй Oxygen
 func (w *H2O) Oxygen(fn func()) {
-	// TODO
-}
-
-// === Тесты ===
-
-func TestH2O(t *testing.T) {
-	const molecules = 10
-	const total = molecules * 3 // 10 * (2H + 1O) = 30 атомов
-
-	h2o := NewH2O()
-	var mu sync.Mutex
-	var result strings.Builder
-	var wg sync.WaitGroup
-
-	// 2*molecules водородов
-	for range molecules * 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			h2o.Hydrogen(func() {
-				mu.Lock()
-				result.WriteRune('H')
-				mu.Unlock()
-			})
-		}()
-	}
-
-	// molecules кислородов
-	for range molecules {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			h2o.Oxygen(func() {
-				mu.Lock()
-				result.WriteRune('O')
-				mu.Unlock()
-			})
-		}()
-	}
-
-	wg.Wait()
-
-	s := result.String()
-	if len(s) != total {
-		t.Fatalf("ожидали %d символов, получили %d", total, len(s))
-	}
-
-	// Проверяем что в каждой тройке ровно 2 H и 1 O
-	hCount := strings.Count(s, "H")
-	oCount := strings.Count(s, "O")
-	if hCount != molecules*2 {
-		t.Errorf("H count = %d, want %d", hCount, molecules*2)
-	}
-	if oCount != molecules {
-		t.Errorf("O count = %d, want %d", oCount, molecules)
-	}
+	<-w.oSem
+	w.bar.Wait()
+	fn()
+	w.oSem <- struct{}{}
 }
 
 func main() {

@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -53,14 +54,71 @@ func mockFetch(ctx context.Context, url string) (Result, error) {
 // TODO: реализуй fastest
 // Подсказка: отмена ctx распространяется на все запросы автоматически — не заботься об явном завершении
 func fastest(ctx context.Context, urls []string) (Result, error) {
+	ctxInside, cancel := context.WithCancel(ctx)
+	defer cancel()
 	// TODO: реализуй
-	return Result{}, errors.New("TODO: реализуй")
+	type response struct {
+		resp Result
+		err error
+	}
+
+	ch := make(chan response)
+	wg := sync.WaitGroup{}
+	for _, url := range urls {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, err := mockFetch(ctxInside, url)
+			select {
+			case <-ctxInside.Done():
+				return
+			case ch <- response{resp: res, err: err}:
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	var lastError error
+
+	for el := range ch {
+		if el.err == nil {
+			cancel()
+			return Result{URL: el.resp.URL, Body: el.resp.Body}, nil
+		}
+		lastError = el.err
+	}
+
+	if lastError != nil {
+		return Result{}, ErrAllFailed
+	}
+
+	return Result{}, ctx.Err()
 }
 
 // TODO: реализуй withTimeout
 func withTimeout(d time.Duration, fn func() (string, error)) (string, error) {
 	// TODO
-	return "", errors.New("TODO: реализуй")
+	type response struct {
+		resp string
+		err error
+	}
+	ch := make(chan response, 1)
+
+	go func() {
+		res, err := fn()
+		ch <- response{resp: res, err: err}
+	}()
+
+	select {
+	case <-time.After(d):
+		return "", ErrTimeout
+	case el := <-ch:
+		return el.resp, el.err
+	}
 }
 
 func main() {

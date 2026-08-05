@@ -39,31 +39,54 @@ type TryMutex struct {
 // TODO: реализуй NewTryMutex
 // Подсказка: сам факт "владения" можно выразить наличием токена в канале
 func NewTryMutex() *TryMutex {
-	return nil
+	m := &TryMutex{ch: make(chan struct{}, 1)}
+	m.ch <- struct{}{}
+	return m
 }
 
 // TODO: реализуй Lock
 func (m *TryMutex) Lock() {
+	<-m.ch
 }
 
 // TODO: реализуй TryLock — non-blocking
 // Подсказка: как через select понять что канал "не готов прямо сейчас"?
 func (m *TryMutex) TryLock() bool {
-	return false
+	select {
+	case <-m.ch:
+		return true
+	default:
+		return false
+	}
 }
 
 // TODO: реализуй LockTimeout
 func (m *TryMutex) LockTimeout(d time.Duration) bool {
-	return false
+	select {
+	case <-m.ch:
+		return true
+	case <-time.After(d):
+		return false
+	}
 }
 
 // TODO: реализуй LockContext
 func (m *TryMutex) LockContext(ctx context.Context) error {
-	return nil
+	select {
+	case <-m.ch:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // TODO: реализуй Unlock (с паникой при двойном Unlock)
 func (m *TryMutex) Unlock() {
+	select {
+	case m.ch <- struct{}{}:
+	default:
+		panic("unlock of unlocked mutex")
+	}
 }
 
 func main() {

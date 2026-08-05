@@ -60,7 +60,10 @@ func New() *WriterPriorityRWMutex {
 func (m *WriterPriorityRWMutex) RLock() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// TODO
+	for m.writerActive || m.writersWaiting > 0 {
+		m.readerCond.Wait()
+	}
+	m.readerCount++
 }
 
 // TODO: реализуй RUnlock
@@ -68,14 +71,22 @@ func (m *WriterPriorityRWMutex) RLock() {
 func (m *WriterPriorityRWMutex) RUnlock() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// TODO
+	m.readerCount--
+	if m.readerCount == 0 {
+		m.writerCond.Signal()
+	}
 }
 
 // TODO: реализуй Lock
 func (m *WriterPriorityRWMutex) Lock() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// TODO: зарегистрируй ожидание, жди пока читатели уйдут и нет другого писателя
+	m.writersWaiting++
+	for m.readerCount > 0 || m.writerActive {
+		m.writerCond.Wait()
+	}
+	m.writersWaiting--
+	m.writerActive = true
 }
 
 // TODO: реализуй Unlock
@@ -84,7 +95,12 @@ func (m *WriterPriorityRWMutex) Lock() {
 func (m *WriterPriorityRWMutex) Unlock() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// TODO
+	m.writerActive = false
+	if m.writersWaiting > 0 {
+		m.writerCond.Signal()
+	} else {
+		m.readerCond.Broadcast()
+	}
 }
 
 func main() {

@@ -50,28 +50,60 @@ func NewBroker[T any]() *Broker[T] {
 func (b *Broker[T]) Subscribe(topic string) <-chan T {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	// TODO
-	return nil
+	if b.closed {
+		ch := make(chan T)
+		close(ch)
+		return ch
+	}
+	ch := make(chan T, 10)
+	b.subscribers[topic] = append(b.subscribers[topic], ch)
+	return ch
 }
 
 // TODO: реализуй Unsubscribe
 func (b *Broker[T]) Unsubscribe(topic string, sub <-chan T) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	// TODO
+	subs := b.subscribers[topic]
+	for i, ch := range subs {
+		if ch == sub {
+			close(ch)
+			b.subscribers[topic] = append(subs[:i], subs[i+1:]...)
+			return
+		}
+	}
 }
 
 // TODO: реализуй Publish
 // Подсказка: медленный подписчик не должен блокировать остальных
 func (b *Broker[T]) Publish(topic string, msg T) {
-	// TODO
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.closed {
+		return
+	}
+	for _, ch := range b.subscribers[topic] {
+		select {
+		case ch <- msg:
+		default:
+		}
+	}
 }
 
 // TODO: реализуй Close
 func (b *Broker[T]) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	// TODO
+	if b.closed {
+		return
+	}
+	b.closed = true
+	for topic, subs := range b.subscribers {
+		for _, ch := range subs {
+			close(ch)
+		}
+		b.subscribers[topic] = nil
+	}
 }
 
 func main() {

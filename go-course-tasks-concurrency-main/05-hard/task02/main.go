@@ -40,12 +40,12 @@ func scenario1() {
 		close(done)
 	}()
 
-	mu2.Lock()
-	time.Sleep(1 * time.Millisecond)
 	mu1.Lock()
+	time.Sleep(1 * time.Millisecond)
+	mu2.Lock()
 	fmt.Println("B: захватил оба мьютекса")
-	mu1.Unlock()
 	mu2.Unlock()
+	mu1.Unlock()
 
 	<-done
 }
@@ -57,7 +57,7 @@ func scenario1() {
 
 func scenario2() {
 	ch := make(chan int)
-	ch <- 42
+	go func() { ch <- 42 }()
 	fmt.Println("sent:", <-ch)
 }
 
@@ -79,8 +79,8 @@ func (c *SafeCounter) Inc() {
 
 func (c *SafeCounter) IncAndLog() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.count++
+	c.mu.Unlock()
 	c.Inc()
 }
 
@@ -100,9 +100,9 @@ func scenario4() {
 	results := make([]int, 5)
 
 	for i := 0; i < 5; i++ {
+		wg.Add(1)
 		n := i
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
 			results[n] = n * n

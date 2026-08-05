@@ -46,29 +46,46 @@ type Future[T any] struct {
 // TODO: реализуй Async — запускает fn в горутине, возвращает Future
 // Подсказка: закрытие канала — универсальный сигнал готовности
 func Async[T any](fn func() (T, error)) *Future[T] {
-	return nil
+	f := &Future[T]{done: make(chan struct{})}
+	go func() {
+		defer close(f.done)
+		f.value, f.err = fn()
+	}()
+	return f
 }
 
 // TODO: реализуй Await
 func (f *Future[T]) Await() (T, error) {
-	var zero T
-	return zero, nil
+	<-f.done
+	return f.value, f.err
 }
 
 // TODO: реализуй AwaitTimeout
 func (f *Future[T]) AwaitTimeout(d time.Duration) (T, error, bool) {
 	var zero T
-	return zero, ErrFutureTimeout, false
+	select {
+	case <-f.done:
+		return f.value, f.err, true
+	case <-time.After(d):
+		return zero, ErrFutureTimeout, false
+	}
 }
 
 // TODO: реализуй Done
 func (f *Future[T]) Done() <-chan struct{} {
-	return nil
+	return f.done
 }
 
 // TODO: реализуй Then — цепочка: дождись текущего Future и примени fn к результату
 func (f *Future[T]) Then(fn func(T) T) *Future[T] {
-	return nil
+	return Async(func() (T, error) {
+		v, err := f.Await()
+		if err != nil {
+			var zero T
+			return zero, err
+		}
+		return fn(v), nil
+	})
 }
 
 func main() {

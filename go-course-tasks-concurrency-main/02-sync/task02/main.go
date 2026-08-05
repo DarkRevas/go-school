@@ -20,15 +20,18 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 )
 
 // === Версия A: НЕПРАВИЛЬНАЯ — гонка ===
 var globalDB *MockDB
+var mu sync.Mutex
 
 func GetDB_Broken() *MockDB {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if globalDB == nil { // ← гонка: несколько горутин могут пройти это условие
 		globalDB = NewMockDB()
 	}
@@ -37,13 +40,13 @@ func GetDB_Broken() *MockDB {
 
 // === Версия B: Mutex — правильно, но медленно ===
 var (
-	muDB   sync.Mutex
+	muDB   sync.RWMutex
 	dbOnce *MockDB
 )
 
 func GetDB_Mutex() *MockDB {
-	muDB.Lock()
-	defer muDB.Unlock()
+	muDB.RLock()
+	defer muDB.RUnlock()
 	if dbOnce == nil {
 		dbOnce = NewMockDB()
 	}
@@ -58,8 +61,10 @@ var (
 
 // TODO: реализуй GetDB_Once
 func GetDB_Once() *MockDB {
-	// TODO
-	return nil
+	onceDB.Do(func() {
+		singleDB = NewMockDB()
+	})
+	return singleDB
 }
 
 // === Задача 3: Once с обработкой ошибки ===
@@ -83,8 +88,16 @@ func (o *OnceWithError) Do(fn func() (any, error)) (any, error) {
 		return o.val, o.err
 	}
 
-	// TODO: вызови fn(), сохрани результат; done = true только при успехе
-	return nil, errors.New("TODO: реализуй")
+	val, err := fn()
+	if err != nil {
+		return nil, err
+	}
+
+	o.val = val
+	o.err = nil
+	o.done = true
+
+	return val, nil
 }
 
 // === Вспомогательный мок ===

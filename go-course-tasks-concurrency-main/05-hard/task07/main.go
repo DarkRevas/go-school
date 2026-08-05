@@ -34,6 +34,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -48,8 +49,49 @@ type Fetcher interface {
 // Разделяй "обработать одну страницу" и "управлять пулом".
 // Подсказка 3: завершение определяй по sync.WaitGroup + горутина-закрывашка.
 func Crawl(start string, f Fetcher, parallelism int) []string {
-	// TODO
-	return nil
+	if parallelism < 1 {
+		parallelism = 1
+	}
+
+	var (
+		mu      sync.Mutex
+		visited = map[string]struct{}{start: {}}
+		result  []string
+		wg      sync.WaitGroup
+		sem     = make(chan struct{}, parallelism)
+	)
+
+	var crawl func(url string)
+	crawl = func(url string) {
+		defer wg.Done()
+		sem <- struct{}{}
+		links, err := f.Fetch(url)
+		<-sem
+		if err != nil {
+			return
+		}
+		mu.Lock()
+		result = append(result, url)
+		mu.Unlock()
+		for _, link := range links {
+			mu.Lock()
+			_, seen := visited[link]
+			if !seen {
+				visited[link] = struct{}{}
+			}
+			mu.Unlock()
+			if seen {
+				continue
+			}
+			wg.Add(1)
+			go crawl(link)
+		}
+	}
+
+	wg.Add(1)
+	go crawl(start)
+	wg.Wait()
+	return result
 }
 
 // === Mock fetcher для main ===

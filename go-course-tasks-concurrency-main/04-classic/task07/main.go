@@ -48,28 +48,68 @@ type Lock interface {
 // === Reader-preferring ===
 
 type readerPref struct {
-	// TODO: какие поля нужны?
-	mu sync.Mutex
+	mu        sync.Mutex
+	readers   int
+	writing   bool
+	readCond  *sync.Cond
+	writeCond *sync.Cond
 }
 
 // TODO: реализуй NewReaderPreferring
 func NewReaderPreferring() Lock {
-	return &readerPref{}
+	l := &readerPref{}
+	l.readCond = sync.NewCond(&l.mu)
+	l.writeCond = sync.NewCond(&l.mu)
+	return l
 }
 
 // TODO
-func (l *readerPref) RLock()   {}
-func (l *readerPref) RUnlock() {}
+func (l *readerPref) RLock() {
+	l.mu.Lock()
+	for l.writing {
+		l.readCond.Wait()
+	}
+	l.readers++
+	l.mu.Unlock()
+}
+func (l *readerPref) RUnlock() {
+	l.mu.Lock()
+	l.readers--
+	if l.readers == 0 {
+		l.writeCond.Signal()
+	}
+	l.mu.Unlock()
+}
 
 // TODO
-func (l *readerPref) Lock()   {}
-func (l *readerPref) Unlock() {}
+func (l *readerPref) Lock() {
+	l.mu.Lock()
+	for l.writing || l.readers > 0 {
+		l.writeCond.Wait()
+	}
+	l.writing = true
+	l.mu.Unlock()
+}
+func (l *readerPref) Unlock() {
+	l.mu.Lock()
+	l.writing = false
+	l.writeCond.Signal()
+	l.readCond.Broadcast()
+	l.mu.Unlock()
+}
 
 // === Fair (FIFO) ===
 
+type fairWaiter struct {
+	writer bool
+	ready  chan struct{}
+}
+
 type fair struct {
-	// TODO: подумай про очередь ожидающих — каждый "в очереди" со своим сигналом
-	mu sync.Mutex
+	mu            sync.Mutex
+	activeReaders int
+	activeWriter  bool
+	waiters       []*fairWaiter
 }
 
 // TODO: реализуй NewFair
@@ -77,13 +117,69 @@ func NewFair() Lock {
 	return &fair{}
 }
 
-// TODO
-func (l *fair) RLock()   {}
-func (l *fair) RUnlock() {}
+func (l *fair) wakeNext() {
+	if len(l.waiters) == 0 {
+		return
+	}
+	if l.waiters[0].writer {
+		if l.activeReaders > 0 || l.activeWriter {
+			return
+		}
+		w := l.waiters[0]
+		l.waiters = l.waiters[1:]
+		l.activeWriter = true
+		close(w.ready)
+		return
+	}
+	for len(l.waiters) > 0 && !l.waiters[0].writer {
+		w := l.waiters[0]
+		l.waiters = l.waiters[1:]
+		l.activeReaders++
+		close(w.ready)
+	}
+}
 
 // TODO
-func (l *fair) Lock()   {}
-func (l *fair) Unlock() {}
+func (l *fair) RLock() {
+	l.mu.Lock()
+	if !l.activeWriter && len(l.waiters) == 0 {
+		l.activeReaders++
+		l.mu.Unlock()
+		return
+	}
+	w := &fairWaiter{ready: make(chan struct{})}
+	l.waiters = append(l.waiters, w)
+	l.mu.Unlock()
+	<-w.ready
+}
+func (l *fair) RUnlock() {
+	l.mu.Lock()
+	l.activeReaders--
+	if l.activeReaders == 0 {
+		l.wakeNext()
+	}
+	l.mu.Unlock()
+}
+
+// TODO
+func (l *fair) Lock() {
+	l.mu.Lock()
+	if l.activeReaders == 0 && !l.activeWriter && len(l.waiters) == 0 {
+		l.activeWriter = true
+		l.mu.Unlock()
+		return
+	}
+	w := &fairWaiter{writer: true, ready: make(chan struct{})}
+	l.waiters = append(l.waiters, w)
+	l.mu.Unlock()
+	<-w.ready
+}
+func (l *fair) Unlock() {
+	l.mu.Lock()
+	l.activeWriter = false
+	l.wakeNext()
+	l.mu.Unlock()
+}
 
 // === Демо ===
 
