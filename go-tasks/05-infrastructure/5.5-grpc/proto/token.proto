@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package token;
+
+option go_package = "github.com/my-project/token-service/pb";
+
+// TokenService provides token management operations
+service TokenService {
+  // IssueToken creates a new token for a user
+  rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
+  
+  // ValidateToken checks if a token is valid
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  
+  // RevokeToken invalidates an existing token
+  rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse);
+}
+
+message IssueTokenRequest {
+  string user_id = 1;
+  string scope = 2;  // optional scope for the token
+}
+
+message IssueTokenResponse {
+  string token = 1;
+  int64 expires_at = 2;  // unix timestamp
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string scope = 3;
+}
+
+message RevokeTokenRequest {
+  string token = 1;
+  string reason = 2;  // optional reason for revocation
+}
+
+message RevokeTokenResponse {
+  bool revoked = 1;
+}
